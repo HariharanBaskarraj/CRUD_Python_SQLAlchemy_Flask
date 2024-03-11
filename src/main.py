@@ -3,42 +3,52 @@ from keycloak import KeycloakOpenID
 from sqlalchemy.orm import Session
 from .schemas import CreateJobRequest
 from .database import get_database
-from .models import Employee
+# from .models import Employee
+from .models import Category
+from .models import Field
+from .models import Model
+from .models import Project
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-KEYCLOAK_SERVER_URL = "http://192.168.1.20:18080/auth"
-REALM_NAME = "AI-Product"
-CLIENT_ID = "AI-Product"
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Set this to the appropriate origin or origins for your Angular app
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-keycloak_openid = KeycloakOpenID(server_url=KEYCLOAK_SERVER_URL, realm_name=REALM_NAME, client_id=CLIENT_ID)
+@app.get("/categories")
+def get_categories(db: Session = Depends(get_database)):
+    return db.query(Category).all()
 
-# Dependency to get the OAuth2 token from the request headers
-def get_token(authorization: str = Header(...)):
-    try:
-        token = authorization.split("Bearer ")[1]
-    except IndexError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return token
+@app.get("/fields/{category_id}")
+def get_fields_by_category_id(category_id: int, db: Session = Depends(get_database)):
+    category = db.query(Category).filter(Category.category_id == category_id).first()
 
-# Dependency to authenticate using Keycloak
-def authenticate_token(token: str = Depends(get_token)):
-     try:
-        keycloak_openid.introspect(token)
-        yield
-     except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    if category is None:
+        raise HTTPException(status_code=404, detail="Category not found")
 
-@app.get("/")
-def get_all(db: Session = Depends(get_database), token: str = Depends(authenticate_token)):
-    return db.query(Employee).all()
+    return db.query(Field).filter(Field.category_id == category_id).all()
 
-@app.post("/")
+
+@app.get("/models")
+def get_models(db: Session = Depends(get_database)):
+    return db.query(Model).all()
+
+
+@app.post("/create")
 def create(details: CreateJobRequest, db: Session = Depends(get_database)):
-    to_create = Employee(
-        name=details.name,
-        age=details.age,
-        city=details.city
+    to_create = Project(
+
+        projectname=details.projectname,
+        description=details.description,
+        metadatamodelname=details.metadatamodelname,
+        selectedcategory=details.selectedcategory,
+        selectedfield=details.selectedfield,
+        selectedmodel=details.selectedmodel
     )
 
     db.add(to_create)
@@ -48,46 +58,59 @@ def create(details: CreateJobRequest, db: Session = Depends(get_database)):
         "created_id": to_create.id
     }
 
-
-@app.get("/{id}")
-def get_by_id(id: int, db: Session = Depends(get_database)):
-    return db.query(Employee).filter(Employee.id == id).first()
-
-
-# @app.get("/")
-# def get_all(db: Session = Depends(get_database)):
-#     return db.query(Employee).all()
-
-
-@app.delete("/{id}")
-def delete_by_id(id: int, db: Session = Depends(get_database)):
-    db.query(Employee).filter(Employee.id == id).delete()
-    db.commit()
-    return {
-        "success": True
-    }
-
-
-@app.delete("/")
-def delete_by_id(db: Session = Depends(get_database)):
-    db.query(Employee).delete()
-    db.commit()
-    return {
-        "success": True
-    }
-
-
-@app.put("/{id}")
-def update_employee(id: int, updated_data: dict, db: Session = Depends(get_database)):
-    existing_employee = db.query(Employee).filter(Employee.id == id).first()
-
-    if not existing_employee:
-        raise HTTPException(status_code=404, detail="Employee not found")
-
-    for key, value in updated_data.items():
-        setattr(existing_employee, key, value)
-
-    db.commit()
-    return {
-        "message": "Employee updated successfully"
-    }
+# @app.post("/")
+# def create(details: CreateJobRequest, db: Session = Depends(get_database)):
+#     to_create = Employee(
+#         name=details.name,
+#         age=details.age,
+#         city=details.city
+#     )
+#
+#     db.add(to_create)
+#     db.commit()
+#     return {
+#         "success": True,
+#         "created_id": to_create.id
+#     }
+#
+#
+# @app.get("/{id}")
+# def get_by_id(id: int, db: Session = Depends(get_database)):
+#     return db.query(Employee).filter(Employee.id == id).first()
+#
+#
+#
+#
+#
+# @app.delete("/{id}")
+# def delete_by_id(id: int, db: Session = Depends(get_database)):
+#     db.query(Employee).filter(Employee.id == id).delete()
+#     db.commit()
+#     return {
+#         "success": True
+#     }
+#
+#
+# @app.delete("/")
+# def delete_by_id(db: Session = Depends(get_database)):
+#     db.query(Category).delete()
+#     db.commit()
+#     return {
+#         "success": True
+#     }
+#
+#
+# @app.put("/{id}")
+# def update_employee(id: int, updated_data: dict, db: Session = Depends(get_database)):
+#     existing_employee = db.query(Employee).filter(Employee.id == id).first()
+#
+#     if not existing_employee:
+#         raise HTTPException(status_code=404, detail="Employee not found")
+#
+#     for key, value in updated_data.items():
+#         setattr(existing_employee, key, value)
+#
+#     db.commit()
+#     return {
+#         "message": "Employee updated successfully"
+#     }

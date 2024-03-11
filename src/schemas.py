@@ -2,6 +2,9 @@ from pydantic import BaseModel
 
 
 class CreateJobRequest(BaseModel):
-    name: str
-    age: int
-    city: str
+    projectname: str
+    description: str
+    metadatamodelname: str
+    selectedcategory: int
+    selectedfield: int
+    selectedmodel: int
